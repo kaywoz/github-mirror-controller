@@ -5,6 +5,10 @@ on:
   schedule:
     - cron: "0 3 * * *"   # daily at 03:00
 
+env:
+  SKIP_REPOS: github-mirror-controller
+  CODEBERG_OWNER: kaywoz
+
 jobs:
   mirror:
     runs-on: ubuntu-latest
@@ -13,7 +17,7 @@ jobs:
       - name: Install tooling
         run: |
           sudo apt-get update
-          sudo apt-get install -y git jq
+          sudo apt-get install -y git jq gh
 
       - name: Setup SSH for Codeberg
         run: |
@@ -28,19 +32,23 @@ jobs:
         run: |
           gh repo list ${{ github.repository_owner }} \
             --limit 1000 \
-            --json name,sshUrl \
-            --jq '.[] | "\(.name) \(.sshUrl)"' > repos.txt
+            --json name,httpsUrl \
+            --jq '.[] | "\(.name) \(.httpsUrl)"' > repos.txt
 
       - name: Mirror repositories to Codeberg
         run: |
-          while read name sshUrl; do
+          while read name repoUrl; do
+            if [[ "$SKIP_REPOS" == *"$name"* ]]; then
+              echo "Skipping $name"
+              continue
+            fi
+
             echo "=== Mirroring $name ==="
 
             rm -rf "$name.git"
-            git clone --mirror "$sshUrl" "$name.git"
+            git clone --mirror "$repoUrl" "$name.git"
 
             cd "$name.git"
-            git push --mirror "git@codeberg.org:${{ github.repository_owner }}/$name.git" || true
+            git push --mirror "git@codeberg.org:${CODEBERG_OWNER}/$name.git" || true
             cd ..
-
           done < repos.txt
