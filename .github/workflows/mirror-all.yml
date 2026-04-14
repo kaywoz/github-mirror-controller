@@ -3,11 +3,12 @@ name: Mirror all repos to Codeberg
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 3 * * *"   # daily at 03:00
+    - cron: "0 3 * * *"
 
 env:
   SKIP_REPOS: github-mirror-controller
   CODEBERG_OWNER: kaywoz
+  CODEBERG_API: https://codeberg.org/api/v1
 
 jobs:
   mirror:
@@ -17,7 +18,7 @@ jobs:
       - name: Install tooling
         run: |
           sudo apt-get update
-          sudo apt-get install -y git jq gh
+          sudo apt-get install -y git jq gh curl
 
       - name: Setup SSH for Codeberg
         run: |
@@ -32,10 +33,13 @@ jobs:
         run: |
           gh repo list ${{ github.repository_owner }} \
             --limit 1000 \
-            --json name,url \
-            --jq '.[] | "\(.name) \(.url)"' > repos.txt
+            --json name,url,isFork,isArchived \
+            --jq '.[] | select(.isFork == false and .isArchived == false) | "\(.name) \(.url)"' \
+            > repos.txt
 
       - name: Mirror repositories to Codeberg
+        env:
+          CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN }}
         run: |
           while read name repoUrl; do
             if [[ "$SKIP_REPOS" == *"$name"* ]]; then
@@ -43,12 +47,32 @@ jobs:
               continue
             fi
 
-            echo "=== Mirroring $name ==="
+            echo "=== Processing $name ==="
+
+            # Check if repo exists on Codeberg
+            status=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Authorization: token $CODEBERG_TOKEN" \
+              "$CODEBERG_API/repos/$CODEBERG_OWNER/$name")
+
+            if [ "$status" = "404" ]; then
+              echo "Creating $name on Codeberg"
+
+              curl -s -X POST "$CODEBERG_API/user/repos" \
+                -H "Authorization: token $CODEBERG_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"name\": \"$name\",
+                  \"private\": false
+                }"
+            else
+              echo "$name already exists on Codeberg"
+            fi
 
             rm -rf "$name.git"
             git clone --mirror "$repoUrl" "$name.git"
 
             cd "$name.git"
-            git push --mirror "git@codeberg.org:${CODEBERG_OWNER}/$name.git" || true
+            git push --mirror "git@codeberg.org:$CODEBERG_OWNER/$name.git"
             cd ..
+
           done < repos.txt
