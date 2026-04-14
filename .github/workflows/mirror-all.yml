@@ -33,7 +33,7 @@ jobs:
           gh repo list ${{ github.repository_owner }} \
             --limit 1000 \
             --json name,httpsUrl \
-            --jq '.[] | "\(.name) \(.httpsUrl)"' > repos.txt
+            --jq '.[] | "\(.name) \(.url)"' > repos.txt
 
       - name: Mirror repositories to Codeberg
         run: |
