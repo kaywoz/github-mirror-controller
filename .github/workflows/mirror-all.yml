@@ -1,0 +1,46 @@
+name: Mirror all repos to Codeberg
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"   # daily at 03:00
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git jq
+
+      - name: Setup SSH for Codeberg
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.CODEBERG_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan codeberg.org >> ~/.ssh/known_hosts
+
+      - name: List all GitHub repositories
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh repo list ${{ github.repository_owner }} \
+            --limit 1000 \
+            --json name,sshUrl \
+            --jq '.[] | "\(.name) \(.sshUrl)"' > repos.txt
+
+      - name: Mirror repositories to Codeberg
+        run: |
+          while read name sshUrl; do
+            echo "=== Mirroring $name ==="
+
+            rm -rf "$name.git"
+            git clone --mirror "$sshUrl" "$name.git"
+
+            cd "$name.git"
+            git push --mirror "git@codeberg.org:${{ github.repository_owner }}/$name.git" || true
+            cd ..
+
+          done < repos.txt
