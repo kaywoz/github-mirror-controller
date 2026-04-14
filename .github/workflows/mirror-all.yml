@@ -1,4 +1,4 @@
-name: Mirror all repos to Codeberg123
+name: Mirror all repos to Codeberg
 
 on:
   workflow_dispatch:
@@ -32,7 +32,7 @@ jobs:
         run: |
           gh repo list ${{ github.repository_owner }} \
             --limit 1000 \
-            --json name,httpsUrl \
+            --json name,url \
             --jq '.[] | "\(.name) \(.url)"' > repos.txt
 
       - name: Mirror repositories to Codeberg
