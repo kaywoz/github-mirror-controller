@@ -1,4 +1,4 @@
-name: Mirror all repos to Codeberg
+name: mirror all repos to Codeberg
 
 on:
   workflow_dispatch:
