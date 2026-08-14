@@ -71,7 +71,12 @@ jobs:
             rm -rf "$name.git"
             git clone --mirror "$repoUrl" "$name.git"
             cd "$name.git"
-            git push --mirror "git@codeberg.org:$CODEBERG_OWNER/$name.git"
+            # Mirror branches and tags only — GitHub's clone includes refs/pull/*,
+            # which Codeberg (like GitHub) rejects as a protected/hidden ref
+            # namespace, so a plain `push --mirror` fails on those refs.
+            git push --prune "git@codeberg.org:$CODEBERG_OWNER/$name.git" \
+              '+refs/heads/*:refs/heads/*' \
+              '+refs/tags/*:refs/tags/*'
             cd ..
           done < repos.txt
 
