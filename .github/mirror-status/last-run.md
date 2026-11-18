@@ -1,4 +1,4 @@
 # Mirror run log
-Last run: 2026-11-17T11:20:18Z
-Outcome: success
-Repos considered: 12
+Last run: 2026-11-18T10:52:35Z
+Outcome: failure
+Repos considered: unknown
